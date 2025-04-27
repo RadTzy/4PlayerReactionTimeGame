@@ -1,0 +1,439 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+const int buttonPins[4] = {2, 3, 4, 5};
+const int modeButtons[5] = {7, 8, 9, 10, 11};
+const int ledPin = 13;
+const int buzzerPin = 6;
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+int playerScores[4] = {0, 0, 0, 0};
+bool eliminated[4] = {false, false, false, false};
+bool gameStarted = false;
+bool gameOver = false;
+int selectedMode = 0;
+unsigned long debounceDelay = 200;
+
+void setup() {
+  for (int i = 0; i < 4; i++) pinMode(buttonPins[i], INPUT_PULLUP);
+  for (int i = 0; i < 5; i++) pinMode(modeButtons[i], INPUT_PULLUP);
+  pinMode(ledPin, OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
+
+  Serial.begin(9600);
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print("Select Game Mode");
+
+  while (selectedMode == 0) {
+    for (int i = 0; i < 5; i++) {
+      if (isButtonPressed(modeButtons[i])) {
+        selectedMode = i + 1;
+        lcd.clear();
+        lcd.print("Mode ");
+        lcd.print(selectedMode);
+        lcd.setCursor(0, 1);
+        lcd.print("Starting...");
+        delay(2000);
+        lcd.clear();
+        break;
+      }
+    }
+  }
+}
+
+void loop() {
+  switch (selectedMode) {
+    case 1: while (!gameOver) mode1_classicRace(); break;
+    case 2: while (!gameOver) mode2_troySays(); break;
+    case 3: while (!gameOver) mode3_grabThePrize(); break;
+    case 4: while (!gameOver) mode4_teamMemory(); break;
+    case 5: while (!gameOver) mode5_lastManStanding(); break;
+  }
+}
+
+bool isButtonPressed(int pin) {
+  static unsigned long lastPressTime[12] = {0};
+  unsigned long currentTime = millis();
+  int index = pin >= 7 ? pin - 7 : pin - 2;
+  if (digitalRead(pin) == LOW && currentTime - lastPressTime[index] > debounceDelay) {
+    lastPressTime[index] = currentTime;
+    return true;
+  }
+  return false;
+}
+
+void mode1_classicRace() {
+  if (gameOver) return;
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Get ready...");
+  delay(random(2000, 5000));
+
+  digitalWrite(ledPin, HIGH);
+  tone(buzzerPin, 1000, 500);
+  lcd.clear();
+  lcd.print("Press NOW!");
+
+  unsigned long startTime = millis();
+  gameStarted = true;
+
+  while (gameStarted) {
+    for (int i = 0; i < 4; i++) {
+      if (digitalRead(buttonPins[i]) == LOW) {
+        unsigned long reactionTime = millis() - startTime;
+        playerScores[i]++;
+        announceWinner(i + 1, reactionTime / 1000.0);
+        playMarioDeathTune();
+        delay(1000);
+        displayScores();
+        if (playerScores[i] >= 5) {
+          declareWinner(i + 1);
+          gameOver = true;
+        }
+        delay(2000);
+        return;
+      }
+    }
+  }
+}
+
+void announceWinner(int player, float reactionTimeSec) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("P");
+  lcd.print(player);
+  lcd.print(" Win ");
+  lcd.print(reactionTimeSec, 1);
+  lcd.print("s");
+  lcd.setCursor(0, 1);
+  lcd.print("Score: ");
+  lcd.print(playerScores[player - 1]);
+  gameStarted = false;
+  digitalWrite(ledPin, LOW);
+}
+
+void declareWinner(int player) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("CONGRATS P");
+  lcd.print(player);
+  lcd.setCursor(0, 1);
+  lcd.print("You Win!");
+  playVictoryTune();
+  delay(3000);
+}
+
+void displayScores() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("P1:");
+  lcd.print(playerScores[0]);
+  lcd.print(" P2:");
+  lcd.print(playerScores[1]);
+  lcd.setCursor(0, 1);
+  lcd.print("P3:");
+  lcd.print(playerScores[2]);
+  lcd.print(" P4:");
+  lcd.print(playerScores[3]);
+}
+
+void mode2_troySays() {
+  lcd.clear();
+  lcd.print("Troy Says Mode!");
+  delay(2000);
+
+  while (!gameOver) {
+    int command = random(0, 4);
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Troy says press:");
+    lcd.setCursor(0, 1);
+    lcd.print("P");
+    lcd.print(command + 1);
+
+    unsigned long startTime = millis();
+    bool pressed = false;
+
+    while (millis() - startTime < 1700) {
+      for (int i = 0; i < 4; i++) {
+        if (digitalRead(buttonPins[i]) == LOW) {
+          if (i == command) {
+            lcd.clear();
+            lcd.print("Correct P");
+            lcd.print(i + 1);
+            playerScores[i]++;
+          } else {
+            lcd.clear();
+            lcd.print("WRONG P");
+            lcd.print(i + 1);
+            if (playerScores[i] > 0) playerScores[i]--;
+          }
+          pressed = true;
+          delay(1500);
+          break;
+        }
+      }
+      if (pressed) break;
+    }
+
+    if (!pressed) {
+      lcd.clear();
+      lcd.print("Too Slow!");
+      delay(1500);
+    }
+
+    displayScores();
+    delay(2000);
+
+    for (int i = 0; i < 4; i++) {
+      if (playerScores[i] >= 5) {
+        lcd.clear();
+        lcd.print("P");
+        lcd.print(i + 1);
+        lcd.print(" WINS!");
+        playVictoryTune();
+        delay(3000);
+        gameOver = true;
+      }
+    }
+  }
+}
+
+void mode3_grabThePrize() {
+  lcd.clear();
+  lcd.print("Grab the Prize!");
+  delay(2000);
+
+  while (!gameOver) {
+    int currentHolder = random(0, 4);
+    unsigned long startTime = millis();
+    lcd.clear();
+
+    while (millis() - startTime < 6000) {
+      lcd.setCursor(0, 0);
+      lcd.print("P");
+      lcd.print(currentHolder + 1);
+      lcd.print(" has prize");
+
+      float remainingTime = 6.0 - (millis() - startTime) / 1000.0;
+      lcd.setCursor(0, 1);
+      lcd.print("Time: ");
+      lcd.print(remainingTime, 1);
+      lcd.print("s");
+
+      for (int i = 0; i < 4; i++) {
+        if (digitalRead(buttonPins[i]) == LOW) {
+          currentHolder = i;
+          delay(300);
+        }
+      }
+    }
+
+    lcd.clear();
+    lcd.print("P");
+    lcd.print(currentHolder + 1);
+    lcd.print(" gets 1pt");
+    playerScores[currentHolder]++;
+    delay(2000);
+
+    displayScores();
+    delay(2000);
+
+    if (playerScores[currentHolder] >= 5) {
+      lcd.clear();
+      lcd.print("P");
+      lcd.print(currentHolder + 1);
+      lcd.print(" WINS!");
+      playVictoryTune();
+      delay(3000);
+      gameOver = true;
+      break;
+    }
+  }
+}
+
+void mode4_teamMemory() {
+  int correct = 0;
+  int totalRounds = 5;
+
+  lcd.clear();
+  lcd.print("Teamwork Memory!");
+  delay(2000);
+
+  for (int rounds = 0; rounds < totalRounds; rounds++) {
+    int sequence[8];
+    for (int i = 0; i < 8; i++) sequence[i] = random(1, 5);
+
+    lcd.clear();
+    for (int i = 0; i < 8; i++) {
+      lcd.setCursor(0, 0);
+      lcd.print("P");
+      lcd.print(sequence[i]);
+      delay(1500);
+      lcd.clear();
+      delay(500);
+    }
+
+    unsigned long answerStart = millis();
+    int beepsDone = 0;
+    int currentStep = 0;
+    bool failed = false;
+
+    while (millis() - answerStart < 10000 && currentStep < 8) {
+      int elapsedMs = millis() - answerStart;
+      int remainingTime = 10 - elapsedMs / 1000;
+      
+      lcd.setCursor(0, 0);
+      lcd.print("Answer Time!");
+      lcd.setCursor(0, 1);
+      lcd.print("Time: ");
+      lcd.print(remainingTime);
+      lcd.print("s   ");
+
+      if (elapsedMs >= beepsDone * 1000) {
+        tone(buzzerPin, 1000, 100);
+        beepsDone++;
+        delay(100);
+      }
+
+      for (int p = 0; p < 4; p++) {
+        if (digitalRead(buttonPins[p]) == LOW) {
+          if (p + 1 == sequence[currentStep]) {
+            currentStep++;
+            delay(300);
+          } else {
+            failed = true;
+            break;
+          }
+        }
+      }
+      if (failed) break;
+    }
+
+    lcd.clear();
+    if (!failed && currentStep == 8) {
+      lcd.print("Correct!");
+      correct++;
+    } else {
+      lcd.print("Wrong!");
+    }
+    lcd.setCursor(0, 1);
+    lcd.print(correct);
+    lcd.print("/");
+    lcd.print(rounds + 1);
+    delay(2500);
+  }
+
+  lcd.clear();
+  lcd.print("Final Score:");
+  lcd.setCursor(0, 1);
+  lcd.print(correct);
+  lcd.print("/");
+  lcd.print(totalRounds);
+  delay(5000);
+  gameOver = true;
+}
+
+void mode5_lastManStanding() {
+  int remaining = 4;
+
+  while (remaining > 1) {
+    lcd.clear();
+    lcd.print("Get Ready!");
+    delay(random(2000, 5000));
+
+    digitalWrite(ledPin, HIGH);
+    tone(buzzerPin, 1000, 300);
+
+    lcd.clear();
+    lcd.print("Tap NOW!");
+
+    bool pressed[4] = {false, false, false, false};
+    unsigned long startTime = millis();
+    unsigned long pressedTime[4] = {0, 0, 0, 0};
+
+    while (millis() - startTime < 1000) {
+      for (int i = 0; i < 4; i++) {
+        if (!eliminated[i] && digitalRead(buttonPins[i]) == LOW && !pressed[i]) {
+          pressed[i] = true;
+          pressedTime[i] = millis();
+          delay(300);
+        }
+      }
+    }
+
+    int toEliminate = -1;
+    unsigned long minTime = 4294967295;
+
+    bool someoneDidNotPress = false;
+    for (int i = 0; i < 4; i++) {
+      if (!eliminated[i] && !pressed[i]) {
+        toEliminate = i;
+        someoneDidNotPress = true;
+        break;
+      }
+    }
+
+    if (!someoneDidNotPress) {
+      for (int i = 0; i < 4; i++) {
+        if (!eliminated[i] && pressed[i]) {
+          if (pressedTime[i] > minTime) {
+            minTime = pressedTime[i];
+            toEliminate = i;
+          }
+        }
+      }
+    }
+
+    eliminated[toEliminate] = true;
+    remaining--;
+
+    lcd.clear();
+    lcd.print("P");
+    lcd.print(toEliminate + 1);
+    lcd.print(" Eliminated!");
+    delay(2000);
+  }
+
+  int winner = -1;
+  for (int i = 0; i < 4; i++) {
+    if (!eliminated[i]) {
+      winner = i;
+      break;
+    }
+  }
+
+  lcd.clear();
+  lcd.print("P");
+  lcd.print(winner + 1);
+  lcd.print(" Wins!");
+  playVictoryTune();
+  delay(3000);
+  gameOver = true;
+}
+
+void playMarioDeathTune() {
+  tone(buzzerPin, 1000, 200);
+  delay(100);
+  tone(buzzerPin, 200, 200);
+  delay(100);
+  tone(buzzerPin, 300, 200);
+  delay(100);
+  tone(buzzerPin, 400, 200);
+  delay(100);
+  tone(buzzerPin, 500, 200);
+  delay(100);
+}
+
+void playVictoryTune() {
+  tone(buzzerPin, 1000, 300);
+  delay(400);
+  tone(buzzerPin, 1500, 300);
+  delay(400);
+  tone(buzzerPin, 2000, 600);
+  delay(600);
+}
