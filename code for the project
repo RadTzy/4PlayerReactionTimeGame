@@ -166,11 +166,16 @@ void mode2_troySays() {
             lcd.print("Correct P");
             lcd.print(i + 1);
             playerScores[i]++;
+            tone(buzzerPin, 1200, 150); // Win beep
+            digitalWrite(ledPin, HIGH);
+            delay(150);
+            digitalWrite(ledPin, LOW);
           } else {
             lcd.clear();
             lcd.print("WRONG P");
             lcd.print(i + 1);
             if (playerScores[i] > 0) playerScores[i]--;
+            tone(buzzerPin, 500, 300); // Wrong beep
           }
           pressed = true;
           delay(1500);
@@ -213,17 +218,24 @@ void mode3_grabThePrize() {
     unsigned long startTime = millis();
     lcd.clear();
 
-    while (millis() - startTime < 6000) {
+    while (millis() - startTime < 5000) { // 5 seconds with 5 beeps
       lcd.setCursor(0, 0);
       lcd.print("P");
       lcd.print(currentHolder + 1);
       lcd.print(" has prize");
 
-      float remainingTime = 6.0 - (millis() - startTime) / 1000.0;
+      float remainingTime = 5.0 - (millis() - startTime) / 1000.0;
       lcd.setCursor(0, 1);
       lcd.print("Time: ");
       lcd.print(remainingTime, 1);
       lcd.print("s");
+
+      if (((millis() - startTime) / 1000) % 1 == 0) {
+        tone(buzzerPin, 1000, 100);
+        digitalWrite(ledPin, HIGH);
+        delay(100);
+        digitalWrite(ledPin, LOW);
+      }
 
       for (int i = 0; i < 4; i++) {
         if (digitalRead(buttonPins[i]) == LOW) {
@@ -265,6 +277,11 @@ void mode4_teamMemory() {
   delay(2000);
 
   for (int rounds = 0; rounds < totalRounds; rounds++) {
+    lcd.clear();
+    lcd.print("Round ");
+    lcd.print(rounds + 1);
+    delay(2000);
+
     int sequence[8];
     for (int i = 0; i < 8; i++) sequence[i] = random(1, 5);
 
@@ -296,8 +313,10 @@ void mode4_teamMemory() {
 
       if (elapsedMs >= beepsDone * 1000) {
         tone(buzzerPin, 1000, 100);
-        beepsDone++;
+        digitalWrite(ledPin, HIGH);
         delay(100);
+        digitalWrite(ledPin, LOW);
+        beepsDone++;
       }
 
       for (int p = 0; p < 4; p++) {
