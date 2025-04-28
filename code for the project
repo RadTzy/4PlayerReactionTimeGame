@@ -155,6 +155,10 @@ void mode2_troySays() {
     lcd.print("P");
     lcd.print(command + 1);
 
+    // Turn on the LED and beep to indicate it's time to press
+    digitalWrite(ledPin, HIGH);
+    tone(buzzerPin, 1000, 500); // Beep sound when it's time to press
+
     unsigned long startTime = millis();
     bool pressed = false;
 
@@ -184,6 +188,9 @@ void mode2_troySays() {
       }
       if (pressed) break;
     }
+
+    // Turn off the LED after the press time
+    digitalWrite(ledPin, LOW);
 
     if (!pressed) {
       lcd.clear();
@@ -342,7 +349,7 @@ void mode4_teamMemory() {
     }
     lcd.setCursor(0, 1);
     lcd.print(correct);
-    lcd.print("/");
+    lcd.print("/"); 
     lcd.print(rounds + 1);
     delay(2500);
   }
@@ -351,7 +358,7 @@ void mode4_teamMemory() {
   lcd.print("Final Score:");
   lcd.setCursor(0, 1);
   lcd.print(correct);
-  lcd.print("/");
+  lcd.print("/"); 
   lcd.print(totalRounds);
   delay(5000);
   gameOver = true;
